@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pyodbc
+python-jose
+passlib[bcrypt]
+python-multipart
+pydantic
+pydantic-settings
+httpx
+apscheduler
+jinja2
+aiofiles
+python-dotenv
+pystray
+Pillow
+fpdf2

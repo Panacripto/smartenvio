@@ -1,0 +1,14 @@
+node_modules/
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+dist/
+build/
+data/
+*.db
+whatsapp-service/data/
+*.log
+.DS_Store
+private.pem
