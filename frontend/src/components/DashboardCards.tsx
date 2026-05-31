@@ -60,8 +60,8 @@ export default function DashboardCards() {
     if (!modalEjecuciones) return;
     setCargandoEj(true);
     fetch(`http://127.0.0.1:8000/api/dashboard/ejecuciones-hoy?tipo=${modalEjecuciones.tipo}`)
-      .then(r => r.json())
-      .then(setEjecuciones)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => { setEjecuciones(Array.isArray(d) ? d : []); })
       .catch(() => setEjecuciones([]))
       .finally(() => setCargandoEj(false));
   }, [modalEjecuciones]);
