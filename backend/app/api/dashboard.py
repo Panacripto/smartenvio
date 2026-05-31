@@ -58,7 +58,7 @@ def get_dashboard_resumen():
     }
 
 @router.get("/ejecuciones-hoy")
-def get_ejecuciones_hoy(tipo: str = Query("todos", regex="^(todos|enviados|fallidos)$")):
+def get_ejecuciones_hoy(tipo: str = "todos"):
     sql = """
         SELECT cl.id, cl.campaign_id, cl.ejecutado_en, cl.enviados, cl.fallidos, cl.detalles, c.nombre as campaign_nombre
         FROM campaign_log cl
@@ -69,19 +69,17 @@ def get_ejecuciones_hoy(tipo: str = Query("todos", regex="^(todos|enviados|falli
     rows = query_all(sql)
     result = []
     for r in rows or []:
+        if tipo == "enviados" and (r["enviados"] or 0) <= 0:
+            continue
+        if tipo == "fallidos" and (r["fallidos"] or 0) <= 0:
+            continue
         detalles = []
         try:
             import json
             raw = json.loads(r["detalles"]) if isinstance(r["detalles"], str) else (r["detalles"] or [])
-            for entry in raw:
-                ok = entry.startswith("✓")
-                if tipo == "enviados" and not ok: continue
-                if tipo == "fallidos" and ok: continue
-                detalles.append(entry)
+            detalles = list(raw) if isinstance(raw, list) else []
         except:
             pass
-        if tipo != "todos" and not detalles:
-            continue
         result.append({
             "id": r["id"],
             "campaign_id": r["campaign_id"],

@@ -180,18 +180,17 @@ export default function DashboardCards() {
               ) : (
                 <div className="space-y-3">
                   {ejecuciones.map((ej: any) => {
-                    const esFallidos = modalEjecuciones.tipo === "fallidos";
-                    const detalles = ej.detalles || [];
+                    const detalles = Array.isArray(ej.detalles) ? ej.detalles : [];
                     return (
                       <div key={ej.id} className="border rounded-xl overflow-hidden">
-                        <div className={`px-4 py-2 border-b flex items-center justify-between text-sm ${esFallidos ? "bg-red-50" : "bg-green-50"}`}>
+                        <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between text-sm">
                           <span className="font-medium text-gray-700">{ej.campaign_nombre || "Campaña #" + ej.campaign_id}</span>
                           <span className="text-xs text-gray-400">{ej.ejecutado_en?.replace("T", " ")}</span>
                         </div>
                         {detalles.length > 0 ? (
                           <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto">
                             {detalles.map((d: string, i: number) => (
-                              <div key={i} className={`px-4 py-2 text-xs ${d.startsWith("✓") ? "text-gray-700" : "text-red-600"}`}>
+                              <div key={i} className={`px-4 py-2 text-xs ${d.startsWith("✓") || d.startsWith("OK") ? "text-gray-700" : "text-red-600"}`}>
                                 {d}
                               </div>
                             ))}
@@ -199,7 +198,7 @@ export default function DashboardCards() {
                         ) : (
                           <div className="px-4 py-3 text-xs text-gray-400 text-center">Sin detalles</div>
                         )}
-                        <div className="px-4 py-1.5 bg-gray-50 text-xs text-gray-500 flex gap-3">
+                        <div className="px-4 py-1.5 bg-gray-50 text-xs text-gray-500 flex gap-3 border-t">
                           <span className="text-green-600">✓ {ej.enviados} enviados</span>
                           <span className="text-red-600">✗ {ej.fallidos} fallidos</span>
                         </div>
