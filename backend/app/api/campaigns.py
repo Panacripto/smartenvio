@@ -514,6 +514,7 @@ def _camp_loop():
                             if _ya_ejecuto_en_hora_hoy(camp, h):
                                 continue
                             _ejecutar_campana(camp)
+                            break
                     else:
                         if not _debe_ejecutar_hoy(camp):
                             continue
