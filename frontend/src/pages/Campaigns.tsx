@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "@/api/client";
 
 const EMOJIS = [
@@ -24,6 +25,8 @@ const FILTROS = [
 ];
 
 export default function Campaigns() {
+  const [searchParams] = useSearchParams();
+  const filtroInicial = searchParams.get("filtro") || "todas";
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [pagina, setPagina] = useState(1);
@@ -36,7 +39,7 @@ export default function Campaigns() {
   const [showEmojis, setShowEmojis] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [filtroEstado, setFiltroEstado] = useState("todas");
+  const [filtroEstado, setFiltroEstado] = useState(filtroInicial);
   const [busqueda, setBusqueda] = useState("");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
