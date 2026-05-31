@@ -89,9 +89,13 @@ def log(msg):
     root.update_idletasks()
 
 def run(cmd, cwd=None, shell=True, env=None):
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= 1  # STARTF_USESHOWWINDOW
+    si.wShowWindow = 0  # SW_HIDE
     p = subprocess.Popen(cmd, cwd=cwd or BASE, shell=shell, env=env,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         creationflags=subprocess.CREATE_NO_WINDOW)
+                         creationflags=subprocess.CREATE_NO_WINDOW,
+                         startupinfo=si)
     procs.append(p)
     return p
 
@@ -115,22 +119,22 @@ def task():
     kill_by_port()
     time.sleep(1.5)
 
-    # Generar machine code
+    # Generar machine code (UUID + Serial de disco)
     step(1, "Generando identificador del equipo...")
-    mc_launcher = ""
     import hashlib
-    for cmd in ["powershell -Command \"(Get-CimInstance Win32_ComputerSystemProduct).UUID\"",
-                "powershell -Command \"(Get-WmiObject Win32_ComputerSystemProduct).UUID\"",
-                "wmic csproduct get uuid"]:
+    parts = []
+    for cmd, filtro in [("wmic csproduct get uuid", "UUID"),
+                         ("wmic diskdrive get serialnumber", "SerialNumber")]:
         try:
             r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
             for ln in r.stdout.splitlines():
-                ln = ln.strip().strip('\ufeff').strip('\uFEFF')
-                if ln and ln != "UUID" and not ln.startswith("wmic"):
-                    mc_launcher = hashlib.md5(ln.encode()).hexdigest()[:8]
+                ln_val = ln.strip().strip('\ufeff').strip('\uFEFF')
+                if ln_val and ln_val != filtro and not ln_val.startswith("wmic"):
+                    parts.append(hashlib.md5(ln_val.encode()).hexdigest()[:8])
                     break
-            if mc_launcher: break
-        except: pass
+        except:
+            pass
+    mc_launcher = "-".join(parts[:2]) if parts else ""
 
     # Validar licencia desde el launcher (sin backend)
     lic_valida = False
@@ -201,7 +205,7 @@ GQIDAQAB
 
     # Licencia valida: arrancar backend y demas servicios
     step(2, "Iniciando Backend (puerto 8000)...")
-    run(f'"{sys.executable}" -m uvicorn app.main:app --host 127.0.0.1 --port 8000',
+    run(f'"{sys.executable}" -m uvicorn app.main:app --host 0.0.0.0 --port 8000',
         cwd=os.path.join(BASE, "backend"))
     for i in range(15):
         time.sleep(1)
@@ -224,7 +228,12 @@ GQIDAQAB
     time.sleep(2)
 
     step(5, "Iniciando Frontend (puerto 5173)...")
-    run("npm run preview", cwd=os.path.join(BASE, "frontend"))
+    p_f = subprocess.Popen(
+        ["node", "node_modules/vite/bin/vite.js", "dev", "--host", "--port", "5173"],
+        cwd=os.path.join(BASE, "frontend"),
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NO_WINDOW)
+    procs.append(p_f)
     time.sleep(2)
 
     step(6, "Abriendo navegador...")
@@ -253,11 +262,15 @@ def watchdog():
             if not puerto_activo(puerto) and watchdog_active:
                 log(f"⚠ {nombre} caído, reiniciando...")
                 if puerto == "8000":
+                    si2 = subprocess.STARTUPINFO()
+                    si2.dwFlags |= 1
+                    si2.wShowWindow = 0
                     p2 = subprocess.Popen(
-                        [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+                        [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"],
                         cwd=os.path.join(BASE, "backend"),
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                        creationflags=subprocess.CREATE_NO_WINDOW, text=True)
+                        creationflags=subprocess.CREATE_NO_WINDOW, text=True,
+                        startupinfo=si2)
                     procs.append(p2)
                     def _leer2(p=p2):
                         for ln in p.stdout or []: print("BACKEND:", ln.rstrip())
@@ -265,7 +278,12 @@ def watchdog():
                 elif puerto == "3001":
                     run("node index.js", cwd=os.path.join(BASE, "whatsapp-service"))
                 elif puerto == "5173":
-                    run("npm run preview", cwd=os.path.join(BASE, "frontend"))
+                    pf2 = subprocess.Popen(
+                        ["node", "node_modules/vite/bin/vite.js", "dev", "--host", "--port", "5173"],
+                        cwd=os.path.join(BASE, "frontend"),
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        creationflags=subprocess.CREATE_NO_WINDOW)
+                    procs.append(pf2)
                 time.sleep(5)
                 if puerto_activo(puerto):
                     log(f"✅ {nombre} reiniciado")

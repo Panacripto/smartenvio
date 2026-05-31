@@ -82,3 +82,24 @@ export async function sendTestWhatsApp(telefono: string, mensaje: string) {
   const { data } = await api.post("/whatsapp/send", { telefono, mensaje });
   return data;
 }
+
+export async function fetchContactos(search?: string) {
+  const params = search ? { search } : {};
+  const { data } = await api.get("/contactos", { params });
+  return data;
+}
+
+export async function createContacto(body: { nombre: string; telefono: string; email?: string; notas?: string }) {
+  const { data } = await api.post("/contactos", body);
+  return data;
+}
+
+export async function updateContacto(id: number, body: { nombre?: string; telefono?: string; email?: string; notas?: string }) {
+  const { data } = await api.put(`/contactos/${id}`, body);
+  return data;
+}
+
+export async function deleteContacto(id: number) {
+  const { data } = await api.delete(`/contactos/${id}`);
+  return data;
+}

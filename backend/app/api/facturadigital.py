@@ -1,4 +1,3 @@
-import json, os
 import threading
 import time
 from datetime import date, datetime, timedelta
@@ -7,13 +6,11 @@ from pydantic import BaseModel
 import httpx
 
 from app.database.odbc_connector import odbc_connector
-from app.database.sqlite_connector import query as sqlite_query, execute as sqlite_execute
+from app.database.sqlite_connector import query as sqlite_query, query_one, execute as sqlite_execute
 from app.config import settings
 from app.services.pdf_generator import generar_factura_pdf
 
 router = APIRouter()
-
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "facturadigital_config.json")
 
 DEFAULT_MENSAJE = "Estimado: {cliente} hemos emitido la siguiente(s) facturas a su nombre:\n{facturas}"
 
@@ -23,30 +20,46 @@ DEFAULT_CONFIG = {
     "auto_intervalo": 5,
     "enviar_pdf": True,
     "incluir_sello": True,
+    "formato_pdf": "carta",
     "empresa_razon_social": "MI EMPRESA, C.A.",
     "empresa_rif": "J-12345678-9",
     "empresa_direccion": "Av. Principal, Edificio Empresa, Piso 1",
     "empresa_telefono": "0212-1234567",
     "empresa_logo": "",
+    "telefono_catchall": "",
+    "catchall_activo": False,
 }
 
 
 def _load_config():
-    try:
-        with open(CONFIG_FILE) as f:
-            cfg = json.load(f)
-            for k, v in DEFAULT_CONFIG.items():
-                cfg.setdefault(k, v)
-            return cfg
-    except:
+    row = query_one("SELECT * FROM config_facturadigital WHERE id=1")
+    if not row:
         return dict(DEFAULT_CONFIG)
+    cfg = {}
+    for k in DEFAULT_CONFIG:
+        val = row.get(k)
+        if val is None:
+            val = DEFAULT_CONFIG[k]
+        cfg[k] = val
+    cfg["auto_activo"] = bool(cfg["auto_activo"])
+    cfg["enviar_pdf"] = bool(cfg["enviar_pdf"])
+    cfg["incluir_sello"] = bool(cfg["incluir_sello"])
+    cfg["formato_pdf"] = cfg.get("formato_pdf", "carta") or "carta"
+    cfg["catchall_activo"] = bool(cfg.get("catchall_activo", False))
+    return cfg
 
 
 def _save_config(data: dict):
-    cfg = _load_config()
-    cfg.update(data)
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(cfg, f, indent=2)
+    sqlite_execute("""UPDATE config_facturadigital SET
+        mensaje=?, auto_activo=?, auto_intervalo=?, enviar_pdf=?, incluir_sello=?,
+        formato_pdf=?, empresa_razon_social=?, empresa_rif=?, empresa_direccion=?, empresa_telefono=?, empresa_logo=?,
+        telefono_catchall=?, catchall_activo=?""",
+        (data.get("mensaje", ""), 1 if data.get("auto_activo") else 0, data.get("auto_intervalo", 5),
+         1 if data.get("enviar_pdf", True) else 0, 1 if data.get("incluir_sello", True) else 0,
+         data.get("formato_pdf", "carta"),
+         data.get("empresa_razon_social", ""), data.get("empresa_rif", ""),
+         data.get("empresa_direccion", ""), data.get("empresa_telefono", ""), data.get("empresa_logo", ""),
+         data.get("telefono_catchall", ""), 1 if data.get("catchall_activo") else 0))
 
 
 def _formatear_fecha(f):
@@ -61,11 +74,14 @@ class MensajeConfig(BaseModel):
     auto_intervalo: int = 5
     enviar_pdf: bool = True
     incluir_sello: bool = True
+    formato_pdf: str = "carta"
     empresa_razon_social: str = ""
     empresa_rif: str = ""
     empresa_direccion: str = ""
     empresa_telefono: str = ""
     empresa_logo: str = ""
+    telefono_catchall: str = ""
+    catchall_activo: bool = False
 
 
 @router.get("/config")
@@ -75,6 +91,8 @@ def get_config():
 
 @router.post("/config")
 def set_config(body: MensajeConfig):
+    if body.catchall_activo and not body.telefono_catchall.strip():
+        raise HTTPException(400, "Debes escribir un teléfono catch-all o desactivar la opción")
     _save_config(body.model_dump())
     return {"ok": True}
 
@@ -204,7 +222,9 @@ def _procesar_y_enviar(facturas_pendientes: list) -> dict:
         return {"enviados": 0, "fallidos": 0, "detalles": []}
 
     config = _load_config()
+    formato_pdf = config.get("formato_pdf", "carta")
     plantilla = config.get("mensaje", DEFAULT_MENSAJE)
+    catchall_tel = _normalizar_tel(config.get("telefono_catchall", "")) if config.get("catchall_activo") else None
 
     enviados = 0
     fallidos = 0
@@ -249,7 +269,7 @@ def _procesar_y_enviar(facturas_pendientes: list) -> dict:
             try:
                 detail = _query_detail(doc)
                 client_data = _query_cliente(f.get("FTI_RESPONSABLE", ""))
-                pdf_b64 = generar_factura_pdf(f, detail, client_data, config)
+                pdf_b64 = generar_factura_pdf(f, detail, client_data, config, formato=formato_pdf)
             except Exception as e:
                 fallidos += 1
                 detalles.append(f"Error generando PDF {doc}: {e}")
@@ -259,6 +279,9 @@ def _procesar_y_enviar(facturas_pendientes: list) -> dict:
         mensaje = plantilla
         mensaje = mensaje.replace("{empresa_razon_social}", config.get("empresa_razon_social", ""))
         mensaje = mensaje.replace("{empresa_rif}", config.get("empresa_rif", ""))
+        from app.api.rates import get_rate_vars
+        for k, v in get_rate_vars().items():
+            mensaje = mensaje.replace("{" + k + "}", v)
         mensaje = mensaje.replace("{cliente}", cliente)
         mensaje = mensaje.replace("{facturas}",
             f"DOCUMENTO: {doc}\nFECHA: {fecha}\nTOTAL$: {total_usd:.2f}\nTASA: {factor:.2f}\nTOTAL Bs.: {total_bs:.2f}")
@@ -275,6 +298,14 @@ def _procesar_y_enviar(facturas_pendientes: list) -> dict:
             if resp.status_code == 200:
                 enviados += 1
                 docs_enviados_ahora.append((doc, tel, f.get("FTI_RESPONSABLE", "")))
+                if catchall_tel:
+                    try:
+                        payload_catch = dict(payload)
+                        payload_catch["telefono"] = catchall_tel
+                        httpx.post(f"{settings.whatsapp_service_url}/api/send",
+                                   json=payload_catch, timeout=60)
+                    except:
+                        pass
             else:
                 fallidos += 1
                 body = resp.text[:500] if resp.text else "(vacio)"

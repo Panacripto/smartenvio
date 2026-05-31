@@ -4,18 +4,18 @@ import { ServiceStatus } from "./ServiceStatus";
 
 const items = [
   { to: "/", label: "Vincular Teléfono", icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" },
-  { to: "/envio-masivo", label: "Envío Masivo", icon: "M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" },
-  { to: "/cobranza", label: "Cobranza", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" },
-  { to: "/factura-digital", label: "Factura Digital", icon: "M9 12h6M9 16h6M9 8h6M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-3-2-2 2-2-2-2 2-2-2-3 2z" },
   { to: "/smartenvio", label: "SmartEnvios", icon: "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" },
+  { to: "/factura-digital", label: "Factura Digital", icon: "M9 12h6M9 16h6M9 8h6M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-3-2-2 2-2-2-2 2-2-2-3 2z" },
+  { to: "/cobranza", label: "Cobranza", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" },
+  { to: "/gestion-pagos", label: "Gestión de Pagos", icon: "M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2zm7-5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z" },
+  { to: "/envio-masivo", label: "Envío Masivo", icon: "M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" },
   { to: "/campaigns", label: "Campañas", icon: "M11 3.055A9.001 9.001 0 1020.945 13H11V3.055zM13 2.055V11h8.945A9.001 9.001 0 0013 2.055z" },
   { to: "/configuracion", label: "Configuración", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm3-16l1.3 3.26a9.96 9.96 0 0 1 2.46 1.42l3.38-.68 1.42 2.46-2.18 2.66a9.96 9.96 0 0 1 0 2.84l2.18 2.66-1.42 2.46-3.38-.68a9.96 9.96 0 0 1-2.46 1.42L15 21h-3l-1.3-3.26a9.96 9.96 0 0 1-2.46-1.42l-3.38.68-1.42-2.46 2.18-2.66a9.96 9.96 0 0 1 0-2.84L3.44 7.7l1.42-2.46 3.38.68A9.96 9.96 0 0 1 10.7 4.5L12 1h3z" },
 ];
 
 export function Sidebar() {
   const cerrarSesion = async () => {
-    try { await api.post("/shutdown"); } catch {}
-    try { window.close(); } catch {}
+    try { await api.post("/whatsapp/logout"); } catch {}
   };
 
   return (

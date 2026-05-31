@@ -213,7 +213,7 @@ export default function Cobranza() {
               {clientes.map((c, i) => (
                 <label key={c.FC_CODIGO} className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm transition-colors hover:bg-green-50/60 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                   <input type="checkbox" checked={selected.has(c.FC_CODIGO)} onChange={() => toggleCliente(c.FC_CODIGO)} className="rounded border-gray-300" />
-                  <span className="font-mono text-xs font-medium text-gray-700 w-16">{c.FC_CODIGO}</span>
+                  <span className="font-mono text-xs font-medium text-gray-700 w-16 truncate">{c.FC_CODIGO}</span>
                   <span className="flex-1 truncate text-gray-700">{c.FC_DESCRIPCION}</span>
                   <span className="text-xs text-gray-400 w-28">{c.FC_TELEFONO || "-"}</span>
                   <span className="text-xs font-mono text-red-600 font-medium w-28 text-right">

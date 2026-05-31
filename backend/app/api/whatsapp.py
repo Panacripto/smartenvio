@@ -8,12 +8,10 @@ from app.config import settings
 router = APIRouter()
 
 def _load_empresa_config():
-    cfg_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "facturadigital_config.json")
-    try:
-        with open(cfg_path) as f:
-            return json.load(f)
-    except:
-        return {}
+    from app.database.sqlite_connector import query_one
+    row = query_one("SELECT empresa_razon_social, empresa_rif FROM config_facturadigital WHERE id=1")
+    return {"empresa_razon_social": row["empresa_razon_social"] if row else "",
+            "empresa_rif": row["empresa_rif"] if row else ""}
 
 
 class SendRequest(BaseModel):
@@ -55,6 +53,9 @@ def send_message(body: SendRequest):
         msg = body.mensaje
         msg = msg.replace("{empresa_razon_social}", cfg.get("empresa_razon_social", ""))
         msg = msg.replace("{empresa_rif}", cfg.get("empresa_rif", ""))
+        from app.api.rates import get_rate_vars
+        for k, v in get_rate_vars().items():
+            msg = msg.replace("{" + k + "}", v)
         payload = {
             "telefono": body.telefono,
             "mensaje": msg,

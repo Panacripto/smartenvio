@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "@/api/client";
+import DashboardCards from "@/components/DashboardCards";
 
 export default function WhatsAppPage() {
   const [status, setStatus] = useState("disconnected");
@@ -63,8 +64,9 @@ export default function WhatsAppPage() {
   const e = estados[status as keyof typeof estados] || estados.disconnected;
 
   return (
-    <div className="h-full flex items-start justify-center pt-8">
-      <div className="w-full max-w-4xl">
+    <div className="min-h-full flex flex-col">
+      <div className="p-6 pb-0 flex-1">
+        <DashboardCards />
         <h2 className="text-2xl font-bold text-gray-800 mb-6">WhatsApp</h2>
         <div className="grid grid-cols-2 gap-6">
           {/* Columna izquierda: QR + Estado */}

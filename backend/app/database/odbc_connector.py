@@ -1,13 +1,14 @@
-import json, os, pyodbc
+import pyodbc
 from typing import Optional, Any
 from app.config import settings
+from app.database.sqlite_connector import query_one
 
 
 def _load_saved_connstr() -> str:
     try:
-        cf = os.path.join(os.path.dirname(os.path.dirname(__file__)), "odbc_config.json")
-        with open(cf) as f:
-            return json.load(f).get("connection_string", "") or ""
+        from app.database.sqlite_connector import query_one
+        row = query_one("SELECT connection_string FROM config_odbc WHERE id=1")
+        return row["connection_string"] if row else ""
     except:
         return ""
 

@@ -12,6 +12,7 @@ let qrCodeData = null;
 let clientStatus = "disconnected";
 let client = null;
 let cachedFooter = "";
+let cachedPhone = "";
 let startTime = Date.now();
 let stuckCheckInterval = null;
 
@@ -77,6 +78,7 @@ function initClient() {
     client.on("ready", () => {
         clientStatus = "connected";
         qrCodeData = null;
+        cachedPhone = client?.info?.wid?.user || client?.info?.me?.user || "";
     });
 
     client.on("disconnected", (reason) => {
@@ -89,6 +91,12 @@ function initClient() {
 
     client.on("auth_failure", () => {
         clientStatus = "auth_failure";
+        console.log("Auth failure detected, cleaning session and restarting...");
+        cleanStuckSession();
+        setTimeout(() => {
+            initClient();
+            client.initialize();
+        }, 2000);
     });
 
     client.initialize();
@@ -113,23 +121,29 @@ app.get("/api/status", async (req, res) => {
         try {
             await client.getState();
         } catch {
+            console.log("Session corrupt (getState failed), auto-recovering...");
             realStatus = "disconnected";
             clientStatus = "disconnected";
+            cleanStuckSession();
+            setTimeout(() => {
+                initClient();
+                client.initialize();
+            }, 2000);
         }
     }
     // If stuck in disconnected for >30s with no QR, clean session and restart
     if (realStatus === "disconnected" && !qrCodeData && (Date.now() - startTime) > 30000) {
-        console.log("Session stuck, cleaning and restarting...");
+        console.log("Session stuck for 30s, cleaning and restarting...");
         cleanStuckSession();
         clientStatus = "disconnected";
         qrCodeData = null;
         startTime = Date.now();
         setTimeout(() => {
             initClient();
-            if (client) client.initialize();
+            client.initialize();
         }, 1000);
     }
-    res.json({ status: realStatus, hasQr: !!qrCodeData });
+    res.json({ status: realStatus, hasQr: !!qrCodeData, phone: realStatus === "connected" ? cachedPhone : null });
 });
 
 app.get("/api/qr", (req, res) => {
@@ -240,6 +254,26 @@ app.post("/api/logout", async (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 initClient();
+
+// Background health-check every 15s to auto-recover even without polling
+stuckCheckInterval = setInterval(() => {
+    if (client && clientStatus === "connected") {
+        client.getState().catch(() => {
+            console.log("[health] getState failed, recovering...");
+            clientStatus = "disconnected";
+            cleanStuckSession();
+            setTimeout(() => { initClient(); client.initialize(); }, 2000);
+        });
+    } else if (clientStatus === "disconnected" && !qrCodeData && (Date.now() - startTime) > 45000) {
+        console.log("[health] Stuck for 45s, recovering...");
+        cleanStuckSession();
+        clientStatus = "disconnected";
+        qrCodeData = null;
+        startTime = Date.now();
+        setTimeout(() => { initClient(); client.initialize(); }, 1000);
+    }
+}, 15000);
+
 app.listen(PORT, () => {
     console.log(`WhatsApp service running on port ${PORT}`);
 });

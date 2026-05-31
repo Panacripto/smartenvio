@@ -1,3 +1,0 @@
-{
-  "mensaje": "*{empresa_razon_social}*\n{empresa_rif}\n\nHola *{FC_DESCRIPCION}*, su apreciada cuenta presenta  *{FC_DOCUMENTOS}* facturas *{FC_CRITERIO}* que totalizan un monto de *{FC_SALDO_TOTAL} $*. Agradecemos realizar el pago a la mayor brevedad posible, si ya realizo su pago, haga caso omiso a este mensaje, Gracias."
-}

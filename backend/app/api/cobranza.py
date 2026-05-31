@@ -1,32 +1,20 @@
-import json
-import os
 from fastapi import APIRouter
 from pydantic import BaseModel
 from app.database.odbc_connector import odbc_connector
+from app.database.sqlite_connector import query_one, execute as sqlite_execute
 
 router = APIRouter()
-
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "..", "cobranza_config.json")
-CONFIG_FILE = os.path.normpath(CONFIG_FILE)
 
 DEFAULT_MENSAJE = "Hola *{FC_DESCRIPCION}*, su apreciada cuenta presenta  *{FC_DOCUMENTOS}* facturas *{FC_CRITERIO}* que totalizan un monto de *{FC_SALDO_TOTAL} $*. Agradecemos realizar el pago a la mayor brevedad posible, si ya realizo su pago, haga caso omiso a este mensaje, Gracias."
 
 
 def _load_config():
-    try:
-        with open(CONFIG_FILE) as f:
-            cfg = json.load(f)
-            cfg.setdefault("mensaje", DEFAULT_MENSAJE)
-            return cfg
-    except:
-        return {"mensaje": DEFAULT_MENSAJE}
+    row = query_one("SELECT mensaje FROM config_cobranza WHERE id=1")
+    return {"mensaje": row["mensaje"] if row else DEFAULT_MENSAJE}
 
 
 def _save_config(data: dict):
-    cfg = _load_config()
-    cfg.update(data)
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(cfg, f, indent=2)
+    sqlite_execute("UPDATE config_cobranza SET mensaje=?", (data.get("mensaje", ""),))
 
 
 class CobranzaConfig(BaseModel):

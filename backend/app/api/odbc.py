@@ -1,26 +1,20 @@
-import json, os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import pyodbc
 
 from app.database.odbc_connector import odbc_connector
+from app.database.sqlite_connector import query_one, execute as sqlite_execute
 
 router = APIRouter()
 
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "odbc_config.json")
-
 
 def _load_saved_connstr() -> str:
-    try:
-        with open(CONFIG_FILE) as f:
-            return json.load(f).get("connection_string", "") or ""
-    except:
-        return ""
+    row = query_one("SELECT connection_string FROM config_odbc WHERE id=1")
+    return row["connection_string"] if row else ""
 
 
 def _save_connstr(cs: str):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump({"connection_string": cs}, f)
+    sqlite_execute("UPDATE config_odbc SET connection_string=?", (cs,))
 
 
 class PreviewRequest(BaseModel):

@@ -212,6 +212,16 @@ def init_db():
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS contactos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                telefono TEXT NOT NULL,
+                email TEXT DEFAULT '',
+                notas TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            );
+
             CREATE TABLE IF NOT EXISTS campaign_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 campaign_id INTEGER NOT NULL,
@@ -223,10 +233,91 @@ def init_db():
                 detalles TEXT,
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS config_smartenvio (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                activo INTEGER NOT NULL DEFAULT 1
+            );
+            INSERT OR IGNORE INTO config_smartenvio (id, activo) VALUES (1, 1);
+
+            CREATE TABLE IF NOT EXISTS config_smartenvio_reglas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dias INTEGER NOT NULL UNIQUE,
+                activo INTEGER NOT NULL DEFAULT 1,
+                etiqueta TEXT NOT NULL DEFAULT '',
+                mensaje TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS config_odbc (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                connection_string TEXT NOT NULL DEFAULT ''
+            );
+            INSERT OR IGNORE INTO config_odbc (id, connection_string) VALUES (1, '');
+
+            CREATE TABLE IF NOT EXISTS config_facturadigital (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                mensaje TEXT NOT NULL DEFAULT '',
+                auto_activo INTEGER NOT NULL DEFAULT 0,
+                auto_intervalo INTEGER NOT NULL DEFAULT 5,
+                enviar_pdf INTEGER NOT NULL DEFAULT 1,
+                incluir_sello INTEGER NOT NULL DEFAULT 1,
+                empresa_razon_social TEXT NOT NULL DEFAULT '',
+                empresa_rif TEXT NOT NULL DEFAULT '',
+                empresa_direccion TEXT NOT NULL DEFAULT '',
+                empresa_telefono TEXT NOT NULL DEFAULT '',
+                empresa_logo TEXT NOT NULL DEFAULT ''
+            );
+            INSERT OR IGNORE INTO config_facturadigital (id) VALUES (1);
+
+            CREATE TABLE IF NOT EXISTS config_cobranza (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                mensaje TEXT NOT NULL DEFAULT ''
+            );
+            INSERT OR IGNORE INTO config_cobranza (id) VALUES (1);
+
+            CREATE TABLE IF NOT EXISTS config_footer (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                texto TEXT NOT NULL DEFAULT ''
+            );
+            INSERT OR IGNORE INTO config_footer (id) VALUES (1);
+
+            CREATE TABLE IF NOT EXISTS config_gestionpagos (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                mensaje TEXT NOT NULL DEFAULT '',
+                telefono1 TEXT NOT NULL DEFAULT '',
+                telefono2 TEXT NOT NULL DEFAULT '',
+                telefono3 TEXT NOT NULL DEFAULT '',
+                activo INTEGER NOT NULL DEFAULT 0
+            );
+            INSERT OR IGNORE INTO config_gestionpagos (id) VALUES (1);
+
+            CREATE TABLE IF NOT EXISTS pagos_proveedores (
+                codigo TEXT PRIMARY KEY,
+                nombre TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS pagos_documentos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                proveedor_codigo TEXT NOT NULL,
+                numero TEXT NOT NULL DEFAULT '',
+                monto REAL NOT NULL DEFAULT 0,
+                fecha_vencimiento TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (proveedor_codigo) REFERENCES pagos_proveedores(codigo)
+            );
         """)
         # Migrations for existing DBs
-        for col in ("hora_envio TEXT", "hora_fin TEXT", "repetir_cada INTEGER DEFAULT 0"):
+        migraciones = [
+            ("campaigns", "hora_envio TEXT"),
+            ("campaigns", "hora_fin TEXT"),
+            ("campaigns", "repetir_cada INTEGER DEFAULT 0"),
+            ("campaigns", "filtro TEXT"),
+            ("config_facturadigital", "formato_pdf TEXT DEFAULT 'carta'"),
+            ("campaigns", "proximo_reintento TEXT"),
+            ("config_facturadigital", "telefono_catchall TEXT DEFAULT ''"),
+            ("config_facturadigital", "catchall_activo INTEGER DEFAULT 0"),
+        ]
+        for tbl, col in migraciones:
             try:
-                conn.execute(f"ALTER TABLE campaigns ADD COLUMN {col}")
+                conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col}")
             except:
                 pass

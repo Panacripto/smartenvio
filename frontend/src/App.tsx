@@ -2,18 +2,22 @@ import { useEffect, useState } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/layout";
 import WhatsAppPage from "@/pages/WhatsAppPage";
+import { initTheme } from "@/lib/theme";
 import EnvioMasivo from "@/pages/EnvioMasivo";
 import Configuracion from "@/pages/Configuracion";
 import Cobranza from "@/pages/Cobranza";
 import SmartEnvios from "@/pages/SmartEnvios";
 import FacturaDigital from "@/pages/FacturaDigital";
 import Campaigns from "@/pages/Campaigns";
+import GestionPagos from "@/pages/GestionPagos";
 import api from "@/api/client";
 
 export default function App() {
   const [licenciaValida, setLicenciaValida] = useState<boolean | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [verificado, setVerificado] = useState(false);
+
+  useEffect(() => { initTheme(); }, []);
 
   useEffect(() => {
     (async () => {
@@ -75,6 +79,7 @@ export default function App() {
           <Route path="/smartenvio" element={<SmartEnvios />} />
           <Route path="/factura-digital" element={<FacturaDigital />} />
           <Route path="/campaigns" element={<Campaigns />} />
+          <Route path="/gestion-pagos" element={<GestionPagos />} />
           <Route path="/configuracion" element={<Configuracion />} />
         </Route>
       </Routes>

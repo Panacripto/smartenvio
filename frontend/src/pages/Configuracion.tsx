@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "@/api/client";
+import { getTheme, setTheme, getShowRates, setShowRates } from "@/lib/theme";
+import type { Theme } from "@/lib/theme";
 
 interface ReglaUI {
   dias: number;
@@ -8,7 +10,7 @@ interface ReglaUI {
   mensaje: string;
 }
 
-const DIAS_REGLA = [15, 7, 3, 0];
+const DIAS_REGLA = [15, 7, 3, 0, -1];
 
 export default function Configuracion() {
   const [connStr, setConnStr] = useState("");
@@ -25,28 +27,55 @@ export default function Configuracion() {
   const [fdAutoIntervalo, setFdAutoIntervalo] = useState(5);
   const [fdEnviarPdf, setFdEnviarPdf] = useState(true);
   const [fdIncluirSello, setFdIncluirSello] = useState(true);
+  const [fdFormatoPdf, setFdFormatoPdf] = useState("carta");
   const [fdEmpresaRazon, setFdEmpresaRazon] = useState("");
   const [fdEmpresaRif, setFdEmpresaRif] = useState("");
   const [fdEmpresaDir, setFdEmpresaDir] = useState("");
   const [fdEmpresaTel, setFdEmpresaTel] = useState("");
   const [fdEmpresaLogo, setFdEmpresaLogo] = useState("");
   const [fdLogoPreview, setFdLogoPreview] = useState("");
+  const [fdCatchallTel, setFdCatchallTel] = useState("");
+  const [fdCatchallActivo, setFdCatchallActivo] = useState(false);
   const [fdGuardando, setFdGuardando] = useState(false);
   const [fdMsg, setFdMsg] = useState("");
 
   const [cbMensaje, setCbMensaje] = useState("");
   const [cbGuardando, setCbGuardando] = useState(false);
 
+  const [tema, setTemaState] = useState<Theme>(getTheme);
+  const [showRates, setShowRatesState] = useState(getShowRates);
   const [footerTexto, setFooterTexto] = useState("");
   const [footerGuardando, setFooterGuardando] = useState(false);
   const [footerMsg, setFooterMsg] = useState("");
   const [cbMsg, setCbMsg] = useState("");
+
+  const cambiarTema = (t: Theme) => { setTemaState(t); setTheme(t); };
+  const toggleRates = () => { const v = !showRates; setShowRatesState(v); setShowRates(v); };
+
+  const [gpMensaje, setGpMensaje] = useState("");
+  const [gpTel1, setGpTel1] = useState("");
+  const [gpTel2, setGpTel2] = useState("");
+  const [gpTel3, setGpTel3] = useState("");
+  const [gpActivo, setGpActivo] = useState(false);
+  const [gpGuardando, setGpGuardando] = useState(false);
+  const [gpMsg, setGpMsg] = useState("");
 
   const [expandSe, setExpandSe] = useState(true);
   const [expandSeRegla, setExpandSeRegla] = useState<number>(15);
   const [showEmojisFd, setShowEmojisFd] = useState(false);
   const [showEmojisCb, setShowEmojisCb] = useState(false);
   const [showEmojisSe, setShowEmojisSe] = useState<number | null>(null);
+  const [preview, setPreview] = useState<{ titulo: string; texto: string } | null>(null);
+
+  const abrirPreview = async (tipo: string, template: string, criterio?: string, dias?: number) => {
+    const titulos: Record<string, string> = { gestionpagos: "Vista previa - Gestión de Pagos", smartenvio: "Vista previa - SmartEnvios", cobranza: "Vista previa - Cobranza", facturadigital: "Vista previa - Factura Digital" };
+    try {
+      const r = await api.post("/preview", { tipo, template, criterio: criterio || "todas", dias: dias || 0 });
+      setPreview({ titulo: titulos[tipo] || "Vista previa", texto: r.data.vista });
+    } catch (e: any) {
+      setPreview({ titulo: "Error", texto: e.response?.data?.detail || e.message });
+    }
+  };
 
   const EMOJIS = ["😀","😁","😂","🤣","😊","😎","👍","👎","🙌","👏","🎉","🎊","❤️","💯","✅","❌","⭐","🔥","💪","🤝","👋","📢","📌","🎯","💰","📈","📊","🏆","🛒","🚚","📦","🎁","🔔","📞","✉️","📱","☀️","🌧️","⏰","📅","🔴","🟢","🟡","🔵","🟣","⚪","🟠","🟤"];
 
@@ -79,16 +108,27 @@ export default function Configuracion() {
       setFdAutoIntervalo(r.data.auto_intervalo || 5);
       setFdEnviarPdf(r.data.enviar_pdf !== false);
       setFdIncluirSello(r.data.incluir_sello !== false);
+      setFdFormatoPdf(r.data.formato_pdf || "carta");
       setFdEmpresaRazon(r.data.empresa_razon_social || "");
       setFdEmpresaRif(r.data.empresa_rif || "");
       setFdEmpresaDir(r.data.empresa_direccion || "");
       setFdEmpresaTel(r.data.empresa_telefono || "");
       setFdEmpresaLogo(r.data.empresa_logo || "");
+      setFdCatchallTel(r.data.telefono_catchall || "");
+      setFdCatchallActivo(r.data.catchall_activo || false);
       setFdLogoPreview(r.data.empresa_logo ? `data:image/png;base64,${r.data.empresa_logo}` : "");
     }).catch(() => {});
 
     api.get("/cobranza/config").then(r => {
       if (r.data.mensaje) setCbMensaje(r.data.mensaje);
+    }).catch(() => {});
+
+    api.get("/gestion-pagos/config").then(r => {
+      setGpMensaje(r.data.mensaje || "");
+      setGpTel1(r.data.telefono1 || "");
+      setGpTel2(r.data.telefono2 || "");
+      setGpTel3(r.data.telefono3 || "");
+      setGpActivo(r.data.activo || false);
     }).catch(() => {});
 
     api.get("/config/footer").then(r => {
@@ -140,6 +180,10 @@ export default function Configuracion() {
   };
 
   const guardarFd = async () => {
+    if (fdCatchallActivo && !fdCatchallTel.trim()) {
+      setFdMsg("Escribe un teléfono catch-all o desactiva la opción");
+      return;
+    }
     setFdGuardando(true);
     setFdMsg("");
     try {
@@ -149,11 +193,14 @@ export default function Configuracion() {
         auto_intervalo: fdAutoIntervalo,
         enviar_pdf: fdEnviarPdf,
         incluir_sello: fdIncluirSello,
+        formato_pdf: fdFormatoPdf,
         empresa_razon_social: fdEmpresaRazon,
         empresa_rif: fdEmpresaRif,
         empresa_direccion: fdEmpresaDir,
         empresa_telefono: fdEmpresaTel,
         empresa_logo: fdEmpresaLogo,
+        telefono_catchall: fdCatchallTel,
+        catchall_activo: fdCatchallActivo,
       });
       setFdMsg("Guardado");
     } catch (e: any) {
@@ -172,6 +219,28 @@ export default function Configuracion() {
       setCbMsg("Error: " + (e.response?.data?.detail || e.message));
     }
     setCbGuardando(false);
+  };
+
+  const guardarGp = async () => {
+    if (gpActivo && !gpTel1.trim() && !gpTel2.trim() && !gpTel3.trim()) {
+      setGpMsg("Escribe al menos un teléfono o desactiva la opción");
+      return;
+    }
+    setGpGuardando(true);
+    setGpMsg("");
+    try {
+      await api.post("/gestion-pagos/config", {
+        mensaje: gpMensaje,
+        telefono1: gpTel1,
+        telefono2: gpTel2,
+        telefono3: gpTel3,
+        activo: gpActivo,
+      });
+      setGpMsg("Guardado");
+    } catch (e: any) {
+      setGpMsg("Error: " + (e.response?.data?.detail || e.message));
+    }
+    setGpGuardando(false);
   };
 
   const guardarFooter = async () => {
@@ -261,6 +330,32 @@ export default function Configuracion() {
             <span className="text-xs font-medium text-gray-700">Incluir sello PROCESADO en PDF</span>
           </label>
 
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-medium text-gray-700">Formato PDF:</span>
+            <select className="border rounded px-2 py-1 text-xs" value={fdFormatoPdf} onChange={e => setFdFormatoPdf(e.target.value)}>
+              <option value="carta">Carta (A4)</option>
+              <option value="media_carta">Media Carta (A5)</option>
+              <option value="ticket">Ticket (80 mm)</option>
+            </select>
+          </div>
+
+          <div className="border-t pt-3 mt-3">
+            <label className="flex items-center gap-2 mb-2 cursor-pointer">
+              <div className={`relative w-9 h-5 rounded-full transition-colors ${fdCatchallActivo ? "bg-green-500" : "bg-gray-300"}`}>
+                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${fdCatchallActivo ? "translate-x-4" : ""}`}></div>
+                <input type="checkbox" className="sr-only" checked={fdCatchallActivo} onChange={e => setFdCatchallActivo(e.target.checked)} />
+              </div>
+              <span className="text-xs font-medium text-gray-700">Enviar copia a catch-all</span>
+            </label>
+            {fdCatchallActivo && (
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs text-gray-500 shrink-0">Teléfono:</span>
+                <input className={`border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-48 ${fdCatchallActivo && !fdCatchallTel.trim() ? "border-red-400 bg-red-50" : ""}`} value={fdCatchallTel} onChange={e => setFdCatchallTel(e.target.value)} placeholder="+584121234567" />
+                {fdCatchallActivo && !fdCatchallTel.trim() && <span className="text-xs text-red-500">Requerido</span>}
+              </div>
+            )}
+          </div>
+
           <p className="text-xs text-gray-400 mb-2">
             Variables disponibles:
           </p>
@@ -289,6 +384,12 @@ export default function Configuracion() {
               setFdMensaje(prev => prev.substring(0, s) + "{facturas}" + prev.substring(e));
               setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 10; ta.focus(); }, 0);
             }}>{`{facturas}`}</button>
+            <span className="text-[10px] text-gray-400 self-center">Tasas:</span>
+            <button className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md px-2 py-1 font-medium" onClick={() => { const ta = document.getElementById("fd-textarea") as HTMLTextAreaElement; if (!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; setFdMensaje(prev => prev.substring(0, s) + "{bcv_usd}" + prev.substring(e)); setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 9; ta.focus(); }, 0); }}>{`{bcv_usd}`}</button>
+            <button className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md px-2 py-1 font-medium" onClick={() => { const ta = document.getElementById("fd-textarea") as HTMLTextAreaElement; if (!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; setFdMensaje(prev => prev.substring(0, s) + "{bcv_eur}" + prev.substring(e)); setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 9; ta.focus(); }, 0); }}>{`{bcv_eur}`}</button>
+            <button className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md px-2 py-1 font-medium" onClick={() => { const ta = document.getElementById("fd-textarea") as HTMLTextAreaElement; if (!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; setFdMensaje(prev => prev.substring(0, s) + "{usdt_avg}" + prev.substring(e)); setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 10; ta.focus(); }, 0); }}>{`{usdt_avg}`}</button>
+            <button className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md px-2 py-1 font-medium" onClick={() => { const ta = document.getElementById("fd-textarea") as HTMLTextAreaElement; if (!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; setFdMensaje(prev => prev.substring(0, s) + "{brecha}" + prev.substring(e)); setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 8; ta.focus(); }, 0); }}>{`{brecha}`}</button>
+            <button className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md px-2 py-1 font-medium" onClick={() => { const ta = document.getElementById("fd-textarea") as HTMLTextAreaElement; if (!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; setFdMensaje(prev => prev.substring(0, s) + "{brecha_pct}" + prev.substring(e)); setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 12; ta.focus(); }, 0); }}>{`{brecha_pct}`}</button>
           </div>
           <div className="flex items-center gap-2 mb-2">
             <button
@@ -338,7 +439,7 @@ export default function Configuracion() {
             </div>
           </div>
 
-          <div className="mt-2">
+          <div className="mt-2 flex items-center gap-2">
             <button
               className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 transition-all shadow-sm flex items-center gap-1"
               disabled={fdGuardando}
@@ -351,8 +452,12 @@ export default function Configuracion() {
               )}
               {fdGuardando ? "Guardando..." : "Guardar"}
             </button>
+            <button className="border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 flex items-center gap-1" onClick={() => abrirPreview("facturadigital", fdMensaje)}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              Vista previa
+            </button>
             {fdMsg && (
-              <span className={`ml-2 text-xs ${fdMsg.startsWith("Error") ? "text-red-600" : "text-green-600"}`}>{fdMsg}</span>
+              <span className={`text-xs ${fdMsg.startsWith("Error") ? "text-red-600" : "text-green-600"}`}>{fdMsg}</span>
             )}
           </div>
         </div>
@@ -432,7 +537,7 @@ export default function Configuracion() {
             value={cbMensaje}
             onChange={e => setCbMensaje(e.target.value)}
           />
-          <div className="mt-2">
+          <div className="mt-2 flex items-center gap-2">
             <button
               className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 transition-all shadow-sm flex items-center gap-1"
               disabled={cbGuardando}
@@ -445,8 +550,125 @@ export default function Configuracion() {
               )}
               {cbGuardando ? "Guardando..." : "Guardar"}
             </button>
+            <button className="border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 flex items-center gap-1" onClick={() => abrirPreview("cobranza", cbMensaje)}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              Vista previa
+            </button>
             {cbMsg && (
-              <span className={`ml-2 text-xs ${cbMsg.startsWith("Error") ? "text-red-600" : "text-green-600"}`}>{cbMsg}</span>
+              <span className={`text-xs ${cbMsg.startsWith("Error") ? "text-red-600" : "text-green-600"}`}>{cbMsg}</span>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border shadow-md p-5">
+          <h3 className="text-sm font-bold text-gray-800 mb-2">Gestión de Pagos</h3>
+
+          <label className="flex items-center gap-2 mb-3 cursor-pointer">
+            <div className={`relative w-9 h-5 rounded-full transition-colors ${gpActivo ? "bg-green-500" : "bg-gray-300"}`}>
+              <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${gpActivo ? "translate-x-4" : ""}`}></div>
+              <input type="checkbox" className="sr-only" checked={gpActivo} onChange={e => setGpActivo(e.target.checked)} />
+            </div>
+            <span className="text-xs font-medium text-gray-700">Activo</span>
+          </label>
+
+          <div className="space-y-2 mb-3">
+            <label className="text-xs text-gray-500">Teléfono 1:</label>
+            <input className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" value={gpTel1} onChange={e => setGpTel1(e.target.value)} placeholder="+584121234567" />
+            <label className="text-xs text-gray-500">Teléfono 2 (opcional):</label>
+            <input className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" value={gpTel2} onChange={e => setGpTel2(e.target.value)} placeholder="+584121234567" />
+            <label className="text-xs text-gray-500">Teléfono 3 (opcional):</label>
+            <input className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" value={gpTel3} onChange={e => setGpTel3(e.target.value)} placeholder="+584121234567" />
+          </div>
+
+          <p className="text-xs text-gray-400 mb-2">
+            Variables disponibles:
+          </p>
+          <div className="flex flex-wrap gap-1 mb-2">
+            <button className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-md px-2 py-1 font-medium" onClick={() => {
+              const ta = document.getElementById("gp-textarea") as HTMLTextAreaElement; if (!ta) return;
+              const s = ta.selectionStart, e = ta.selectionEnd;
+              setGpMensaje(prev => prev.substring(0, s) + "{fecha}" + prev.substring(e));
+              setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 7; ta.focus(); }, 0);
+            }}>{`{fecha}`}</button>
+            <button className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-md px-2 py-1 font-medium" onClick={() => {
+              const ta = document.getElementById("gp-textarea") as HTMLTextAreaElement; if (!ta) return;
+              const s = ta.selectionStart, e = ta.selectionEnd;
+              setGpMensaje(prev => prev.substring(0, s) + "{proveedor}" + prev.substring(e));
+              setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 10; ta.focus(); }, 0);
+            }}>{`{proveedor}`}</button>
+            <button className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-md px-2 py-1 font-medium" onClick={() => {
+              const ta = document.getElementById("gp-textarea") as HTMLTextAreaElement; if (!ta) return;
+              const s = ta.selectionStart, e = ta.selectionEnd;
+              setGpMensaje(prev => prev.substring(0, s) + "{codigo}" + prev.substring(e));
+              setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 8; ta.focus(); }, 0);
+            }}>{`{codigo}`}</button>
+            <button className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-md px-2 py-1 font-medium" onClick={() => {
+              const ta = document.getElementById("gp-textarea") as HTMLTextAreaElement; if (!ta) return;
+              const s = ta.selectionStart, e = ta.selectionEnd;
+              setGpMensaje(prev => prev.substring(0, s) + "{total_proveedor}" + prev.substring(e));
+              setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 17; ta.focus(); }, 0);
+            }}>{`{total_proveedor}`}</button>
+            <button className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-md px-2 py-1 font-medium" onClick={() => {
+              const ta = document.getElementById("gp-textarea") as HTMLTextAreaElement; if (!ta) return;
+              const s = ta.selectionStart, e = ta.selectionEnd;
+              setGpMensaje(prev => prev.substring(0, s) + "{lista_proveedores}" + prev.substring(e));
+              setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 19; ta.focus(); }, 0);
+            }}>{`{lista_proveedores}`}</button>
+            <button className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-md px-2 py-1 font-medium" onClick={() => {
+              const ta = document.getElementById("gp-textarea") as HTMLTextAreaElement; if (!ta) return;
+              const s = ta.selectionStart, e = ta.selectionEnd;
+              setGpMensaje(prev => prev.substring(0, s) + "{proveedores}" + prev.substring(e));
+              setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 13; ta.focus(); }, 0);
+            }}>{`{proveedores}`}</button>
+            <button className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-md px-2 py-1 font-medium" onClick={() => {
+              const ta = document.getElementById("gp-textarea") as HTMLTextAreaElement; if (!ta) return;
+              const s = ta.selectionStart, e = ta.selectionEnd;
+              setGpMensaje(prev => prev.substring(0, s) + "{total_general}" + prev.substring(e));
+              setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 15; ta.focus(); }, 0);
+            }}>{`{total_general}`}</button>
+            <button className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-md px-2 py-1 font-medium" onClick={() => {
+              const ta = document.getElementById("gp-textarea") as HTMLTextAreaElement; if (!ta) return;
+              const s = ta.selectionStart, e = ta.selectionEnd;
+              setGpMensaje(prev => prev.substring(0, s) + "{condicion}" + prev.substring(e));
+              setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 11; ta.focus(); }, 0);
+            }}>{`{condicion}`}</button>
+            <button className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-md px-2 py-1 font-medium" onClick={() => {
+              const ta = document.getElementById("gp-textarea") as HTMLTextAreaElement; if (!ta) return;
+              const s = ta.selectionStart, e = ta.selectionEnd;
+              setGpMensaje(prev => prev.substring(0, s) + "{total_vencido}" + prev.substring(e));
+              setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 15; ta.focus(); }, 0);
+            }}>{`{total_vencido}`}</button>
+            <button className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-md px-2 py-1 font-medium" onClick={() => {
+              const ta = document.getElementById("gp-textarea") as HTMLTextAreaElement; if (!ta) return;
+              const s = ta.selectionStart, e = ta.selectionEnd;
+              setGpMensaje(prev => prev.substring(0, s) + "{total_por_vencer}" + prev.substring(e));
+              setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 18; ta.focus(); }, 0);
+            }}>{`{total_por_vencer}`}</button>
+          </div>
+          <textarea id="gp-textarea"
+            className="w-full border rounded-lg px-3 py-2 text-sm min-h-[180px] focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none font-mono"
+            value={gpMensaje}
+            onChange={e => setGpMensaje(e.target.value)}
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 transition-all shadow-sm flex items-center gap-1"
+              disabled={gpGuardando}
+              onClick={guardarGp}
+            >
+              {gpGuardando ? (
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              )}
+              {gpGuardando ? "Guardando..." : "Guardar"}
+            </button>
+            <button className="border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 flex items-center gap-1" onClick={() => abrirPreview("gestionpagos", gpMensaje)}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              Vista previa
+            </button>
+            {gpMsg && (
+              <span className={`text-xs ${gpMsg.startsWith("Error") ? "text-red-600" : "text-green-600"}`}>{gpMsg}</span>
             )}
           </div>
         </div>
@@ -513,7 +735,7 @@ export default function Configuracion() {
                           <input type="checkbox" className="sr-only" checked={reg.activo} readOnly />
                         </div>
                         <span className="text-xs font-medium text-gray-700">
-                          {reg.dias === 0 ? "Vence hoy" : `Vence en ${reg.dias} días`}
+                          {reg.dias === 0 ? "Vence hoy" : reg.dias < 0 ? "Vencidas" : `Vence en ${reg.dias} días`}
                         </span>
                       </div>
                       <span className={`text-gray-400 text-xs transition-transform ${expanded ? "rotate-180" : ""}`}>▼</span>
@@ -525,7 +747,7 @@ export default function Configuracion() {
                           className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 mb-1.5"
                           value={reg.etiqueta}
                           onChange={e => actualizarRegla(reg.dias, "etiqueta", e.target.value)}
-                          placeholder={`Ej: Vence en ${reg.dias} días`}
+                          placeholder={reg.dias < 0 ? "Ej: Vencidas" : `Ej: Vence en ${reg.dias} días`}
                         />
                         <textarea id={`se-textarea-${reg.dias}`}
                           className="w-full border rounded px-2 py-1 text-xs min-h-[100px] focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
@@ -582,6 +804,12 @@ export default function Configuracion() {
                             actualizarRegla(reg.dias, "mensaje", prev.substring(0, s) + "{empresa_rif}" + prev.substring(e));
                             setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 13; ta.focus(); }, 0);
                           }}>{`{empresa_rif}`}</button>
+                          <span className="text-[10px] text-gray-400 self-center">Tasas:</span>
+                          <button className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md px-2 py-1 font-medium" onClick={() => { const ta = document.getElementById(`se-textarea-${reg.dias}`) as HTMLTextAreaElement; if (!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; const prev = reg.mensaje; actualizarRegla(reg.dias, "mensaje", prev.substring(0, s) + "{bcv_usd}" + prev.substring(e)); setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 9; ta.focus(); }, 0); }}>{`{bcv_usd}`}</button>
+                          <button className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md px-2 py-1 font-medium" onClick={() => { const ta = document.getElementById(`se-textarea-${reg.dias}`) as HTMLTextAreaElement; if (!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; const prev = reg.mensaje; actualizarRegla(reg.dias, "mensaje", prev.substring(0, s) + "{bcv_eur}" + prev.substring(e)); setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 9; ta.focus(); }, 0); }}>{`{bcv_eur}`}</button>
+                          <button className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md px-2 py-1 font-medium" onClick={() => { const ta = document.getElementById(`se-textarea-${reg.dias}`) as HTMLTextAreaElement; if (!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; const prev = reg.mensaje; actualizarRegla(reg.dias, "mensaje", prev.substring(0, s) + "{usdt_avg}" + prev.substring(e)); setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 10; ta.focus(); }, 0); }}>{`{usdt_avg}`}</button>
+                          <button className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md px-2 py-1 font-medium" onClick={() => { const ta = document.getElementById(`se-textarea-${reg.dias}`) as HTMLTextAreaElement; if (!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; const prev = reg.mensaje; actualizarRegla(reg.dias, "mensaje", prev.substring(0, s) + "{brecha}" + prev.substring(e)); setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 8; ta.focus(); }, 0); }}>{`{brecha}`}</button>
+                          <button className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md px-2 py-1 font-medium" onClick={() => { const ta = document.getElementById(`se-textarea-${reg.dias}`) as HTMLTextAreaElement; if (!ta) return; const s = ta.selectionStart, e = ta.selectionEnd; const prev = reg.mensaje; actualizarRegla(reg.dias, "mensaje", prev.substring(0, s) + "{brecha_pct}" + prev.substring(e)); setTimeout(() => { ta.selectionStart = ta.selectionEnd = s + 12; ta.focus(); }, 0); }}>{`{brecha_pct}`}</button>
                         </div>
                         <div className="mt-1.5 flex items-center gap-2">
                           <button
@@ -630,6 +858,13 @@ export default function Configuracion() {
                   </span>
                 )}
               </button>
+              <button className="border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 flex items-center gap-1" onClick={() => {
+                const reg = reglas.find(r => r.dias === expandSeRegla);
+                if (reg) abrirPreview("smartenvio", reg.mensaje, undefined, reg.dias);
+              }}>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                Vista previa
+              </button>
               {seMsg && (
                 <span className={`text-xs ${seMsg.startsWith("Error") ? "text-red-600" : "text-green-600"}`}>{seMsg}</span>
               )}
@@ -637,6 +872,77 @@ export default function Configuracion() {
           </div>
         )}
       </div>
+
+      {/* ===== TEMA ===== */}
+      <div className="bg-white rounded-xl border shadow-md p-5">
+        <h3 className="text-sm font-bold text-gray-800 mb-2">Tema de la aplicación</h3>
+        <p className="text-xs text-gray-400 mb-3">Cambia el color principal de la interfaz</p>
+        <div className="flex gap-2">
+          {(["green", "blue", "orange", "red"] as Theme[]).map((t) => (
+            <button key={t} className={`w-10 h-10 rounded-full border-2 transition-all ${tema === t ? "border-gray-800 ring-2 ring-offset-2 ring-gray-400 scale-110" : "border-gray-300 hover:scale-105"}`}
+              style={{ backgroundColor: { green: "#16a34a", blue: "#2563eb", orange: "#ea580c", red: "#dc2626" }[t] }}
+              onClick={() => cambiarTema(t)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ===== INDICADORES ===== */}
+      <div className="bg-white rounded-xl border shadow-md p-5">
+        <h3 className="text-sm font-bold text-gray-800 mb-2">Indicadores financieros</h3>
+        <p className="text-xs text-gray-400 mb-3">Muestra las tasas BCV y USDT en el panel principal</p>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <div className={`relative w-9 h-5 rounded-full transition-colors ${showRates ? "bg-green-500" : "bg-gray-300"}`}>
+            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${showRates ? "translate-x-4" : ""}`}></div>
+            <input type="checkbox" className="sr-only" checked={showRates} onChange={toggleRates} />
+          </div>
+          <span className="text-xs font-medium text-gray-700">Mostrar indicadores financieros</span>
+        </label>
+      </div>
+
+      {/* ===== INICIALIZAR DATOS ===== */}
+      <div className="bg-white rounded-xl border shadow-md p-5 border-red-200">
+        <h3 className="text-sm font-bold text-red-600 mb-2 flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+          Inicializar datos
+        </h3>
+        <p className="text-xs text-gray-500 mb-3">
+          Elimina todos los datos de la aplicaci&oacute;n (clientes, campa&ntilde;as, contactos, historial, configuraciones) y restaura los valores de f&aacute;brica. &Uacute;til al instalar en un nuevo equipo.
+        </p>
+        <button
+          className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600 disabled:opacity-50 transition-all shadow-sm"
+          onClick={async () => {
+            if (!confirm("\u00bfEst\u00e1s seguro? Se eliminar\u00e1n TODOS los datos de la aplicaci\u00f3n. Esta acci\u00f3n no se puede deshacer.")) return;
+            if (!confirm("\u00bfRealmente est\u00e1s seguro? Los datos de clientes, campa\u00f1as, contactos, historial y configuraciones se perder\u00e1n permanentemente.")) return;
+            try {
+              await api.post("/init-data");
+              alert("Datos inicializados correctamente. La aplicaci\u00f3n se reiniciar\u00e1.");
+              window.location.reload();
+            } catch (e: any) {
+              alert("Error: " + (e.response?.data?.detail || e.message));
+            }
+          }}
+        >
+          Inicializar datos
+        </button>
+      </div>
+
+      {/* ===== PREVIEW MODAL ===== */}
+      {preview && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setPreview(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b">
+              <h3 className="text-sm font-bold text-gray-800">{preview.titulo}</h3>
+              <button className="text-gray-400 hover:text-gray-600" onClick={() => setPreview(null)}>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto">
+              <pre className="text-sm font-mono whitespace-pre-wrap bg-gray-50 border rounded-lg p-4">{preview.texto}</pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -18,19 +18,29 @@ GQIDAQAB
 -----END PUBLIC KEY-----"""
 
 
+_MC_CACHE = None
+
+
 def _generar_machine_code() -> str:
-    for cmd in ["powershell -Command \"(Get-CimInstance Win32_ComputerSystemProduct).UUID\"",
-                "powershell -Command \"(Get-WmiObject Win32_ComputerSystemProduct).UUID\"",
-                "wmic csproduct get uuid"]:
+    global _MC_CACHE
+    if _MC_CACHE is not None:
+        return _MC_CACHE
+    parts = []
+    for cmd, filtro, modo in [
+        ("wmic csproduct get uuid", "UUID", 1),
+        ("wmic diskdrive get serialnumber", "SerialNumber", 2),
+    ]:
         try:
             r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
             for ln in r.stdout.splitlines():
-                ln = ln.strip().strip('\ufeff').strip('\uFEFF')
-                if ln and ln != "UUID" and not ln.startswith("wmic"):
-                    return hashlib.md5(ln.encode()).hexdigest()[:8]
+                ln_val = ln.strip().strip('\ufeff').strip('\uFEFF')
+                if ln_val and ln_val != filtro and not ln_val.startswith("wmic"):
+                    parts.append(hashlib.md5(ln_val.encode()).hexdigest()[:8])
+                    break
         except:
             pass
-    return "UNKNOWN"
+    _MC_CACHE = "-".join(parts[:2]) if parts else "UNKNOWN"
+    return _MC_CACHE
 
 
 def _verificar_firma(data: dict, firma_hex: str) -> bool:
