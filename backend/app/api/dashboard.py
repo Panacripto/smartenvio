@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 from app.database.odbc_connector import odbc_connector
-from app.database.sqlite_connector import query_one, query_all
+from app.database.sqlite_connector import query_one, query as query_all
 import httpx
 from app.config import settings
 

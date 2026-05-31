@@ -28,7 +28,7 @@ export default function DashboardCards() {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [rates, setRates] = useState<RatesData | null>(null);
-  const [modalEjecuciones, setModalEjecuciones] = useState<{ tipo: string; titulo: string } | null>(null);
+  const [modalTipo, setModalTipo] = useState<string | null>(null);
   const [ejecuciones, setEjecuciones] = useState<any[]>([]);
   const [cargandoEj, setCargandoEj] = useState(false);
   const mounted = useRef(true);
@@ -57,14 +57,14 @@ export default function DashboardCards() {
   }, []);
 
   useEffect(() => {
-    if (!modalEjecuciones) return;
+    if (!modalTipo) return;
     setCargandoEj(true);
-    fetch(`http://127.0.0.1:8000/api/dashboard/ejecuciones-hoy?tipo=${modalEjecuciones.tipo}`)
+    fetch(`http://127.0.0.1:8000/api/dashboard/ejecuciones-hoy?tipo=${modalTipo}`)
       .then(r => r.ok ? r.json() : [])
       .then(d => { setEjecuciones(Array.isArray(d) ? d : []); })
       .catch(() => setEjecuciones([]))
       .finally(() => setCargandoEj(false));
-  }, [modalEjecuciones]);
+  }, [modalTipo]);
 
   if (!data) return null;
 
@@ -91,7 +91,7 @@ export default function DashboardCards() {
       color: "text-green-600",
       bg: "bg-green-50 border-green-200",
       icon: "M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z",
-      onClick: () => { setModalEjecuciones({ tipo: "enviados", titulo: "Enviados hoy" }); },
+      onClick: () => setModalTipo("enviados"),
     },
     {
       label: "Fallidos hoy",
@@ -99,7 +99,7 @@ export default function DashboardCards() {
       color: "text-red-600",
       bg: "bg-red-50 border-red-200",
       icon: "M12 9v2m0 4h.01m21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-      onClick: () => { setModalEjecuciones({ tipo: "fallidos", titulo: "Fallidos hoy" }); },
+      onClick: () => setModalTipo("fallidos"),
     },
     {
       label: "Clientes a2",
@@ -163,12 +163,12 @@ export default function DashboardCards() {
         </div>
       )}
 
-      {modalEjecuciones && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setModalEjecuciones(null)}>
+      {modalTipo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setModalTipo(null)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full mx-4 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
-              <h3 className="font-semibold text-gray-800">{modalEjecuciones.titulo}</h3>
-              <button className="text-gray-400 hover:text-gray-600 p-1" onClick={() => setModalEjecuciones(null)}>
+              <h3 className="font-semibold text-gray-800">{modalTipo === "enviados" ? "Enviados hoy" : "Fallidos hoy"}</h3>
+              <button className="text-gray-400 hover:text-gray-600 p-1" onClick={() => setModalTipo(null)}>
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -190,7 +190,7 @@ export default function DashboardCards() {
                         {detalles.length > 0 ? (
                           <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto">
                             {detalles.map((d: string, i: number) => (
-                              <div key={i} className={`px-4 py-2 text-xs ${d.startsWith("✓") || d.startsWith("OK") ? "text-gray-700" : "text-red-600"}`}>
+                              <div key={i} className={"px-4 py-2 text-xs " + (d.startsWith("✓") || d.startsWith("OK") ? "text-gray-700" : "text-red-600")}>
                                 {d}
                               </div>
                             ))}
